@@ -8,8 +8,10 @@ import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.utils.RedisIdWorker;
+import com.hmdp.utils.SimpleRedisLock;
 import com.hmdp.utils.UserHolder;
 import org.springframework.aop.framework.AopContext;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +29,8 @@ import java.time.LocalDateTime;
 @Service
 public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder> implements IVoucherOrderService {
 
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
     @Resource
     private ISeckillVoucherService seckillVoucherService;
     @Resource
@@ -58,20 +62,35 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("库存不足");
         }
         Long userId = UserHolder.getUser().getId();
+
+        //分布式锁
+        //创建锁对象
+        SimpleRedisLock lock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
+        //获取锁
+        boolean isLock = lock.tryLock(1200);
+        //判断锁是否获取成功
+        if (!isLock){
+            return Result.fail("不允许重复下单");
+        }
+        try{
         //逻辑：先获取锁、再提交事务、然后才释放锁
         /*
         事务要想生效：spring对当前类做了动态代理、拿到代理对象、用这个对象做的事务处理
         而这里的createVoucherOrder(voucherId);实际上是this.createVoucherOrder(voucherId);
         即不是代理对象、而是目标对象（没有事务功能）
          */
-        synchronized (userId.toString().intern()) {
+//        synchronized (userId.toString().intern()) {
             //拿到当前对象的代理对象:添加依赖  启动类添加注释
             IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
             return proxy.createVoucherOrder(voucherId);
+    //    }
+         }finally {
+            //释放锁
+            lock.unlock();
         }
     }
     @Transactional
-    public Result createVoucherOrder(Long voucherId) {
+        public  Result createVoucherOrder(Long voucherId) {
         //todo 一人一单判断
         /*
         依旧会出现多线程超卖问题
@@ -100,7 +119,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
                     .setSql("stock = stock - 1")
                     //.eq("voucher_id", voucherId)
                     /*
-                    问题：成功率太高了、原因：绝对的禁止了并发操作修改
+                    问题：成功率太低了、原因：绝对的禁止了并发操作修改
                     只要发现被修改了就不执行、但是核心问题是库存依旧足够：却不让并发操作
                      */
                     //.eq("voucher_id", voucherId).eq("stock",voucher.getStock())
@@ -121,6 +140,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             voucherOrder.setId(orderId);
 
             //6.2 用户id      UserHolder：封装threadLocal的类、在拦截器处记录用户信息
+            //Long userId = UserHolder.getUser().getId();
             voucherOrder.setUserId(userId);
 
             //6.3 代金券id

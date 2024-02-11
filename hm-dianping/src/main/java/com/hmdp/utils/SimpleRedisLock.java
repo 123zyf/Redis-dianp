@@ -54,7 +54,7 @@ public class SimpleRedisLock implements ILock{
         Boolean success = stringRedisTemplate
                 .opsForValue()
                 .setIfAbsent(KEY_PREFIX + name, threadId, timeoutSec, TimeUnit.SECONDS);
-        //返回是否获取锁
+        //返回结果：是否获取锁
         // 防止自动拆箱的时候出现空指针异常
         return Boolean.TRUE.equals(success);
     }

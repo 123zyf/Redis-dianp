@@ -23,8 +23,8 @@ public interface IVoucherOrderService extends IService<VoucherOrder> {
 
     /**
      * 单独封装的修改订单操作
-     * @param voucherId
+     * @param voucherOrder
      * @return
      */
-    Result createVoucherOrder(Long voucherId);
+    void createVoucherOrder(VoucherOrder voucherOrder);
 }

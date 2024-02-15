@@ -52,14 +52,14 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     public Result queryById(Long id) {
         //缓存穿透
         //queryWithPassThrough(id);
-        //cacheClient.queryWithPassThrough(CACHE_SHOP_KEY,id,Shop.class,id2->getById(id2),CACHE_SHOP_TTL,TimeUnit.MINUTES);
+        Shop shop = cacheClient.queryWithPassThrough(CACHE_SHOP_KEY,id,Shop.class,id2->getById(id2),CACHE_SHOP_TTL,TimeUnit.MINUTES);
 
         //互斥锁解决缓存击穿
         //Shop shop = queryWithMutex(id);
 
         //逻辑过期解决缓存击穿
         //Shop shop = queryWithLogicalExpire(id);
-        Shop shop = cacheClient.queryWithLogicalExpire(CACHE_SHOP_KEY,id,Shop.class,this::getById,CACHE_SHOP_TTL,TimeUnit.MINUTES);
+        //Shop shop = cacheClient.queryWithLogicalExpire(CACHE_SHOP_KEY,id,Shop.class,this::getById,CACHE_SHOP_TTL,TimeUnit.MINUTES);
 
         if (shop == null){
             return Result.fail("店铺不存在");
@@ -143,9 +143,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         //4、数据库是否能查到数据：如果查不到、说明没有数据
         if (shop == null){
             //todo 解决缓存穿透的问题：使用缓存空对象
-            //stringRedisTemplate.opsForValue().set(key,null,CACHE_NULL_TTL, TimeUnit.MINUTES);
+            //stringRedisTemplate.opsForValue().set(key,"",CACHE_NULL_TTL, TimeUnit.MINUTES);
             //todo 为redis缓存的ttl添加一个随机数、防止缓存雪崩
-            stringRedisTemplate.opsForValue().set(key,null,CACHE_NULL_TTL+Long.getLong(RandomUtil.randomNumbers(6)), TimeUnit.MINUTES);
+            stringRedisTemplate.opsForValue().set(key,"",CACHE_NULL_TTL+Long.getLong(RandomUtil.randomNumbers(6)), TimeUnit.MINUTES);
             return null;
         }
 

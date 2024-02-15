@@ -147,8 +147,8 @@ public class CacheClient {
 
         //3、命中、（JSON反序列化）、判断缓存是否过期
         RedisData redisData = JSONUtil.toBean(json, RedisData.class);
-        JSONObject data = (JSONObject) redisData.getData(); //redisData定义的data是Obj类型、这样操作方便转换类型
-        R r = JSONUtil.toBean(data, type);
+        R r = JSONUtil.toBean((JSONObject) redisData.getData(), type);
+
         //获取设置的过期时间
         LocalDateTime expireTime = redisData.getExpireTime();
 
